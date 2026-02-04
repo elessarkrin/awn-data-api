@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from app.collector import collection_loop
 from app.config import settings
 from app.database import init_db
-from app.routes import daily, monthly, stream, yearly
+from app.routes import history, stream
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,9 +51,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(daily.router, prefix="/api")
-app.include_router(monthly.router, prefix="/api")
-app.include_router(yearly.router, prefix="/api")
+app.include_router(history.router, prefix="/api")
 app.include_router(stream.router, prefix="/api")
 
 

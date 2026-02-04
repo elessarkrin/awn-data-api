@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import DateTime, JSON, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -22,40 +22,6 @@ class DailyReading(Base):
     mac_address: Mapped[str] = mapped_column(String, index=True)
     data: Mapped[dict] = mapped_column(JSON)
 
-
-class MonthlyAggregate(Base):
-    __tablename__ = "monthly_aggregates"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    mac_address: Mapped[str] = mapped_column(String, index=True)
-    year: Mapped[int] = mapped_column(Integer)
-    month: Mapped[int] = mapped_column(Integer)
-    metric_name: Mapped[str] = mapped_column(String)
-    min_value: Mapped[float] = mapped_column(Float)
-    max_value: Mapped[float] = mapped_column(Float)
-    avg_value: Mapped[float] = mapped_column(Float)
-    count: Mapped[int] = mapped_column(Integer)
-
-    __table_args__ = (
-        UniqueConstraint("mac_address", "year", "month", "metric_name"),
-    )
-
-
-class YearlyAggregate(Base):
-    __tablename__ = "yearly_aggregates"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    mac_address: Mapped[str] = mapped_column(String, index=True)
-    year: Mapped[int] = mapped_column(Integer)
-    metric_name: Mapped[str] = mapped_column(String)
-    min_value: Mapped[float] = mapped_column(Float)
-    max_value: Mapped[float] = mapped_column(Float)
-    avg_value: Mapped[float] = mapped_column(Float)
-    count: Mapped[int] = mapped_column(Integer)
-
-    __table_args__ = (
-        UniqueConstraint("mac_address", "year", "metric_name"),
-    )
 
 
 async def init_db():

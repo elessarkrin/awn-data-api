@@ -5,10 +5,17 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.converter import FIELD_DESCRIPTIONS
 from app.database import DailyReading, get_session
-from app.schemas import DailyReadingResponse, PaginatedDailyResponse
+from app.schemas import DailyReadingResponse, FieldDescription, PaginatedDailyResponse
 
-router = APIRouter(prefix="/daily", tags=["daily"])
+router = APIRouter(prefix="/history", tags=["history"])
+
+
+@router.get("/fields", response_model=dict[str, FieldDescription])
+async def get_field_descriptions():
+    """Return metadata describing each field that may appear in a reading response."""
+    return FIELD_DESCRIPTIONS
 
 
 @router.get("", response_model=PaginatedDailyResponse)

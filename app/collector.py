@@ -1,20 +1,18 @@
 """Background service that collects data from Ambient Weather API,
-stores daily readings, computes aggregates, and broadcasts to SSE subscribers."""
+stores daily readings, and broadcasts to SSE subscribers."""
 
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 
 from app.broadcast import broadcaster
 from app.config import settings
-from app.converter import convert_reading, get_numeric_fields
+from app.converter import convert_reading
 from app.database import (
     DailyReading,
-    MonthlyAggregate,
-    YearlyAggregate,
     async_session,
 )
 
@@ -40,18 +38,16 @@ async def fetch_latest_reading() -> dict | None:
     return None
 
 
-async def store_daily_reading(converted: dict, mac_address: str) -> datetime:
-    """Store a converted reading in the daily_readings table. Returns the timestamp."""
-    now = datetime.now(timezone.utc)
+async def store_daily_reading(converted: dict, mac_address: str) -> None:
+    """Store a converted reading in the daily_readings table."""
     async with async_session() as session:
         reading = DailyReading(
-            timestamp=now,
+            timestamp=datetime.now(timezone.utc),
             mac_address=mac_address,
             data=converted,
         )
         session.add(reading)
         await session.commit()
-    return now
 
 
 async def purge_old_readings(mac_address: str) -> int:
@@ -67,112 +63,6 @@ async def purge_old_readings(mac_address: str) -> int:
         await session.commit()
         return result.rowcount
 
-
-async def update_monthly_aggregates(mac_address: str, ts: datetime) -> None:
-    """Recompute monthly aggregates for the month of the given timestamp."""
-    year = ts.year
-    month = ts.month
-
-    # Fetch all daily readings for this month
-    async with async_session() as session:
-        result = await session.execute(
-            select(DailyReading.data).where(
-                DailyReading.mac_address == mac_address,
-                func.strftime("%Y", DailyReading.timestamp) == str(year),
-                func.strftime("%m", DailyReading.timestamp) == f"{month:02d}",
-            )
-        )
-        rows = result.scalars().all()
-
-    if not rows:
-        return
-
-    # Collect all numeric values per metric
-    metrics: dict[str, list[float]] = {}
-    for data in rows:
-        for key, value in get_numeric_fields(data).items():
-            metrics.setdefault(key, []).append(value)
-
-    # Upsert aggregates
-    async with async_session() as session:
-        for metric_name, values in metrics.items():
-            existing = await session.execute(
-                select(MonthlyAggregate).where(
-                    MonthlyAggregate.mac_address == mac_address,
-                    MonthlyAggregate.year == year,
-                    MonthlyAggregate.month == month,
-                    MonthlyAggregate.metric_name == metric_name,
-                )
-            )
-            agg = existing.scalar_one_or_none()
-            if agg:
-                agg.min_value = min(values)
-                agg.max_value = max(values)
-                agg.avg_value = round(sum(values) / len(values), 2)
-                agg.count = len(values)
-            else:
-                agg = MonthlyAggregate(
-                    mac_address=mac_address,
-                    year=year,
-                    month=month,
-                    metric_name=metric_name,
-                    min_value=min(values),
-                    max_value=max(values),
-                    avg_value=round(sum(values) / len(values), 2),
-                    count=len(values),
-                )
-                session.add(agg)
-        await session.commit()
-
-
-async def update_yearly_aggregates(mac_address: str, ts: datetime) -> None:
-    """Recompute yearly aggregates for the year of the given timestamp."""
-    year = ts.year
-
-    async with async_session() as session:
-        result = await session.execute(
-            select(DailyReading.data).where(
-                DailyReading.mac_address == mac_address,
-                func.strftime("%Y", DailyReading.timestamp) == str(year),
-            )
-        )
-        rows = result.scalars().all()
-
-    if not rows:
-        return
-
-    metrics: dict[str, list[float]] = {}
-    for data in rows:
-        for key, value in get_numeric_fields(data).items():
-            metrics.setdefault(key, []).append(value)
-
-    async with async_session() as session:
-        for metric_name, values in metrics.items():
-            existing = await session.execute(
-                select(YearlyAggregate).where(
-                    YearlyAggregate.mac_address == mac_address,
-                    YearlyAggregate.year == year,
-                    YearlyAggregate.metric_name == metric_name,
-                )
-            )
-            agg = existing.scalar_one_or_none()
-            if agg:
-                agg.min_value = min(values)
-                agg.max_value = max(values)
-                agg.avg_value = round(sum(values) / len(values), 2)
-                agg.count = len(values)
-            else:
-                agg = YearlyAggregate(
-                    mac_address=mac_address,
-                    year=year,
-                    metric_name=metric_name,
-                    min_value=min(values),
-                    max_value=max(values),
-                    avg_value=round(sum(values) / len(values), 2),
-                    count=len(values),
-                )
-                session.add(agg)
-        await session.commit()
 
 
 async def collection_loop() -> None:
@@ -194,11 +84,7 @@ async def collection_loop() -> None:
                 logger.warning("No data returned from AWN API")
             else:
                 converted = convert_reading(raw)
-                ts = await store_daily_reading(converted, mac)
-
-                # Update aggregates
-                await update_monthly_aggregates(mac, ts)
-                await update_yearly_aggregates(mac, ts)
+                await store_daily_reading(converted, mac)
 
                 # Purge old daily readings
                 deleted = await purge_old_readings(mac)
@@ -208,7 +94,7 @@ async def collection_loop() -> None:
                 # Broadcast to SSE subscribers
                 await broadcaster.publish(converted)
 
-                logger.debug("Collected and stored reading at %s", ts.isoformat())
+                logger.debug("Collected and stored reading")
 
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:

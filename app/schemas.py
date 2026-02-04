@@ -12,27 +12,10 @@ class DailyReadingResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class AggregateMetric(BaseModel):
-    metric_name: str
-    min_value: float
-    max_value: float
-    avg_value: float
-    count: int
 
-    model_config = {"from_attributes": True}
-
-
-class MonthlyAggregateResponse(BaseModel):
-    mac_address: str
-    year: int
-    month: int
-    metrics: list[AggregateMetric]
-
-
-class YearlyAggregateResponse(BaseModel):
-    mac_address: str
-    year: int
-    metrics: list[AggregateMetric]
+class FieldDescription(BaseModel):
+    description: str
+    unit: str
 
 
 class PaginatedDailyResponse(BaseModel):
