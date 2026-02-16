@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
@@ -97,6 +98,12 @@ app = FastAPI(
             "description": "Service health and readiness checks.",
         },
     ],
+)
+
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=settings.gzip_minimum_size,
+    compresslevel=settings.gzip_compresslevel,
 )
 
 app.add_middleware(

@@ -94,6 +94,12 @@ Payload shape:
 }
 ```
 
+
+### Response Compression
+
+The API enables gzip compression for responses when clients send `Accept-Encoding: gzip`.
+Compression is configurable with `GZIP_MINIMUM_SIZE` and `GZIP_COMPRESSLEVEL`.
+
 ## Setup
 
 ### Prerequisites
@@ -126,6 +132,8 @@ cp .env.example .env
 | `DATABASE_URL`               | SQLAlchemy async database URL                | `sqlite+aiosqlite:///./weather.db` |
 | `CORS_ALLOW_ORIGINS`         | Comma-separated allowed CORS origins         | `http://localhost:5173`     |
 | `REACT_BUILD_DIR`            | React build output directory served at `/app`| `frontend/dist`             |
+| `GZIP_MINIMUM_SIZE`          | Minimum response size (bytes) for gzip       | `500`                       |
+| `GZIP_COMPRESSLEVEL`         | Gzip compression level (1-9)                 | `6`                         |
 
 ### Running
 

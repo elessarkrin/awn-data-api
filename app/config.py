@@ -20,6 +20,8 @@ class Settings(BaseSettings):
         json_schema_extra={"env": "CORS_ALLOW_ORIGINS"}
     )
     cors_allow_credentials: bool = True
+    gzip_minimum_size: int = 500
+    gzip_compresslevel: int = 6
 
     astronomy_api_key: str = ""
     lat: str = ""
