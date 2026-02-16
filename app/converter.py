@@ -1,5 +1,6 @@
 """Imperial to metric unit conversions for Ambient Weather data."""
 
+import math
 from typing import Any
 
 
@@ -17,6 +18,60 @@ def inhg_to_mmhg(inhg: float) -> float:
 
 def inches_to_mm(inches: float) -> float:
     return round(inches * 25.4, 2)
+
+
+def calculate_vpd_kpa(temp_c: float, humidity: float) -> float:
+    """Calculate Vapor Pressure Deficit (kPa) from temperature and relative humidity.
+
+    Formula:
+    - es = 0.6108 * exp((17.27 * T) / (T + 237.3))
+    - ea = es * (RH / 100)
+    - vpd = es - ea
+    """
+    clamped_humidity = max(0.0, min(100.0, humidity))
+    saturation_vapor_pressure = 0.6108 * math.exp((17.27 * temp_c) / (temp_c + 237.3))
+    actual_vapor_pressure = saturation_vapor_pressure * (clamped_humidity / 100.0)
+    return round(saturation_vapor_pressure - actual_vapor_pressure, 3)
+
+
+def calculate_absolute_humidity(temp_c: float, humidity: float) -> float:
+    """Calculate Absolute Humidity (g/m³) from temperature and relative humidity.
+
+    Formula: AH = (6.112 * exp(17.67 * T / (T + 243.5)) * RH * 2.1674) / (273.15 + T)
+    """
+    clamped_humidity = max(0.0, min(100.0, humidity))
+    numerator = 6.112 * math.exp((17.67 * temp_c) / (temp_c + 243.5)) * clamped_humidity * 2.1674
+    return round(numerator / (273.15 + temp_c), 2)
+
+
+def calculate_beaufort_scale(wind_speed_kmh: float) -> int:
+    """Convert wind speed (km/h) to Beaufort scale (0-12)."""
+    speed = max(0.0, wind_speed_kmh)
+    if speed < 1:
+        return 0
+    if speed <= 5:
+        return 1
+    if speed <= 11:
+        return 2
+    if speed <= 19:
+        return 3
+    if speed <= 28:
+        return 4
+    if speed <= 38:
+        return 5
+    if speed <= 49:
+        return 6
+    if speed <= 61:
+        return 7
+    if speed <= 74:
+        return 8
+    if speed <= 88:
+        return 9
+    if speed <= 102:
+        return 10
+    if speed <= 117:
+        return 11
+    return 12
 
 
 # Mapping: original_field -> (metric_field_name, conversion_function_or_None)
@@ -101,57 +156,33 @@ FIELD_CONVERSIONS: dict[str, tuple[str, Any]] = {
 }
 
 # Fields to exclude from the converted output (metadata, not sensor data)
-EXCLUDED_FIELDS = {"macAddress", "device", "loc", "lastRain"}
+EXCLUDED_FIELDS = {
+    "macAddress",
+    "mac_address",
+    "station_mac",
+    "stationMac",
+    "device",
+    "loc",
+    "lastRain",
+}
 
-# Descriptions for each converted field, used by the /fields endpoint
+_SENSITIVE_KEY_NORMALIZED = {"mac", "macaddress", "stationmac"}
+
+# Descriptions for fields currently returned by the station
 FIELD_DESCRIPTIONS: dict[str, dict[str, str]] = {
     # Temperature (°C)
     "temp_c": {"description": "Outdoor Temperature", "unit": "°C"},
     "temp_in_c": {"description": "Indoor Temperature", "unit": "°C"},
-    "temp1_c": {"description": "Temperature Sensor 1", "unit": "°C"},
-    "temp2_c": {"description": "Temperature Sensor 2", "unit": "°C"},
-    "temp3_c": {"description": "Temperature Sensor 3", "unit": "°C"},
-    "temp4_c": {"description": "Temperature Sensor 4", "unit": "°C"},
-    "temp5_c": {"description": "Temperature Sensor 5", "unit": "°C"},
-    "temp6_c": {"description": "Temperature Sensor 6", "unit": "°C"},
-    "temp7_c": {"description": "Temperature Sensor 7", "unit": "°C"},
-    "temp8_c": {"description": "Temperature Sensor 8", "unit": "°C"},
-    "temp9_c": {"description": "Temperature Sensor 9", "unit": "°C"},
-    "temp10_c": {"description": "Temperature Sensor 10", "unit": "°C"},
     "feels_like_c": {"description": "Outdoor Feels Like (Wind Chill if <10°C, Heat Index if >20°C)", "unit": "°C"},
     "feels_like_in_c": {"description": "Indoor Feels Like", "unit": "°C"},
-    "feels_like1_c": {"description": "Feels Like Sensor 1", "unit": "°C"},
-    "feels_like2_c": {"description": "Feels Like Sensor 2", "unit": "°C"},
-    "feels_like3_c": {"description": "Feels Like Sensor 3", "unit": "°C"},
-    "feels_like4_c": {"description": "Feels Like Sensor 4", "unit": "°C"},
-    "feels_like5_c": {"description": "Feels Like Sensor 5", "unit": "°C"},
-    "feels_like6_c": {"description": "Feels Like Sensor 6", "unit": "°C"},
-    "feels_like7_c": {"description": "Feels Like Sensor 7", "unit": "°C"},
-    "feels_like8_c": {"description": "Feels Like Sensor 8", "unit": "°C"},
-    "feels_like9_c": {"description": "Feels Like Sensor 9", "unit": "°C"},
-    "feels_like10_c": {"description": "Feels Like Sensor 10", "unit": "°C"},
     "dew_point_c": {"description": "Outdoor Dew Point", "unit": "°C"},
     "dew_point_in_c": {"description": "Indoor Dew Point", "unit": "°C"},
-    "dew_point1_c": {"description": "Dew Point Sensor 1", "unit": "°C"},
-    "dew_point2_c": {"description": "Dew Point Sensor 2", "unit": "°C"},
-    "dew_point3_c": {"description": "Dew Point Sensor 3", "unit": "°C"},
-    "dew_point4_c": {"description": "Dew Point Sensor 4", "unit": "°C"},
-    "dew_point5_c": {"description": "Dew Point Sensor 5", "unit": "°C"},
-    "dew_point6_c": {"description": "Dew Point Sensor 6", "unit": "°C"},
-    "dew_point7_c": {"description": "Dew Point Sensor 7", "unit": "°C"},
-    "dew_point8_c": {"description": "Dew Point Sensor 8", "unit": "°C"},
-    "dew_point9_c": {"description": "Dew Point Sensor 9", "unit": "°C"},
-    "dew_point10_c": {"description": "Dew Point Sensor 10", "unit": "°C"},
     # Wind (km/h and degrees)
     "wind_speed_kmh": {"description": "Instantaneous wind speed", "unit": "km/h"},
+    "beaufort_scale": {"description": "Wind force category from wind_speed_kmh (0-12)", "unit": "scale"},
     "wind_gust_kmh": {"description": "Max wind speed in the last 10 minutes", "unit": "km/h"},
     "max_daily_gust_kmh": {"description": "Maximum wind speed in last day", "unit": "km/h"},
-    "wind_speed_avg_2m_kmh": {"description": "Average wind speed, 2 minute average", "unit": "km/h"},
-    "wind_speed_avg_10m_kmh": {"description": "Average wind speed, 10 minute average", "unit": "km/h"},
     "wind_dir": {"description": "Instantaneous wind direction", "unit": "°"},
-    "wind_gust_dir": {"description": "Wind direction at which the wind gust occurred", "unit": "°"},
-    "wind_dir_avg_2m": {"description": "Average wind direction, 2 minute average", "unit": "°"},
-    "wind_dir_avg_10m": {"description": "Average wind direction, 10 minute average", "unit": "°"},
     # Pressure (mmHg)
     "barom_rel_mmhg": {"description": "Relative Pressure", "unit": "mmHg"},
     "barom_abs_mmhg": {"description": "Absolute Pressure", "unit": "mmHg"},
@@ -163,28 +194,71 @@ FIELD_DESCRIPTIONS: dict[str, dict[str, str]] = {
     "yearly_rain_mm": {"description": "Yearly Rain", "unit": "mm"},
     "event_rain_mm": {"description": "Event Rain", "unit": "mm"},
     "total_rain_mm": {"description": "Total Rain since last factory reset", "unit": "mm"},
-    "rain_24h_mm": {"description": "24 Hour Rain", "unit": "mm"},
     # Humidity (%)
     "humidity": {"description": "Outdoor Humidity", "unit": "%"},
     "humidity_in": {"description": "Indoor Humidity", "unit": "%"},
-    "humidity1": {"description": "Humidity Sensor 1", "unit": "%"},
-    "humidity2": {"description": "Humidity Sensor 2", "unit": "%"},
-    "humidity3": {"description": "Humidity Sensor 3", "unit": "%"},
-    "humidity4": {"description": "Humidity Sensor 4", "unit": "%"},
-    "humidity5": {"description": "Humidity Sensor 5", "unit": "%"},
-    "humidity6": {"description": "Humidity Sensor 6", "unit": "%"},
-    "humidity7": {"description": "Humidity Sensor 7", "unit": "%"},
-    "humidity8": {"description": "Humidity Sensor 8", "unit": "%"},
-    "humidity9": {"description": "Humidity Sensor 9", "unit": "%"},
-    "humidity10": {"description": "Humidity Sensor 10", "unit": "%"},
+    "vpd_kpa": {"description": "Vapor Pressure Deficit (derived from temp_c and humidity)", "unit": "kPa"},
+    "abs_humidity_gm3": {"description": "Absolute Humidity (derived from temp_c and humidity)", "unit": "g/m³"},
     # UV & Solar
     "uv": {"description": "Ultra-Violet Radiation Index", "unit": "index"},
     "solar_radiation": {"description": "Solar Radiation", "unit": "W/m²"},
+    # Battery
+    "battout": {"description": "Outdoor Battery", "unit": "1=OK, 0=Low"},
     # Metadata
     "date": {"description": "Human readable date", "unit": "ISO 8601"},
     "date_utc": {"description": "Datetime in milliseconds from epoch", "unit": "ms"},
-    "tz": {"description": "IANA Time Zone", "unit": "string"},
 }
+
+
+# Fields that should use max() when aggregating daily summaries
+MAX_FIELDS = {
+    "wind_gust_kmh",
+    "max_daily_gust_kmh",
+    "beaufort_scale",
+    "uv",
+    "solar_radiation",
+    "daily_rain_mm",
+    "weekly_rain_mm",
+    "monthly_rain_mm",
+    "yearly_rain_mm",
+    "event_rain_mm",
+    "total_rain_mm",
+    "rain_24h_mm",
+    "hourly_rain_mm",
+}
+
+# Fields that should use min() when aggregating daily summaries
+MIN_FIELDS: set[str] = set()
+
+# Fields to exclude from aggregation (non-numeric or metadata)
+SKIP_FIELDS = {"date", "date_utc", "tz", "battout"}
+
+
+def add_derived_metrics(reading: dict) -> dict:
+    """Add derived metrics to a reading when required source fields are present."""
+    enriched = dict(reading)
+    temp_c = enriched.get("temp_c")
+    humidity = enriched.get("humidity")
+    wind_speed_kmh = enriched.get("wind_speed_kmh")
+
+    if isinstance(temp_c, (int, float)) and isinstance(humidity, (int, float)):
+        enriched["vpd_kpa"] = calculate_vpd_kpa(float(temp_c), float(humidity))
+        enriched["abs_humidity_gm3"] = calculate_absolute_humidity(float(temp_c), float(humidity))
+    if isinstance(wind_speed_kmh, (int, float)):
+        enriched["beaufort_scale"] = calculate_beaufort_scale(float(wind_speed_kmh))
+
+    return enriched
+
+
+def strip_sensitive_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    """Remove MAC-address-like metadata keys from a payload."""
+    sanitized: dict[str, Any] = {}
+    for key, value in payload.items():
+        normalized = "".join(ch for ch in key.lower() if ch.isalnum())
+        if normalized in _SENSITIVE_KEY_NORMALIZED:
+            continue
+        sanitized[key] = value
+    return sanitized
 
 
 def convert_reading(raw_data: dict) -> dict:
@@ -210,4 +284,4 @@ def convert_reading(raw_data: dict) -> dict:
             # Pass through unknown fields as-is
             converted[key] = value
 
-    return converted
+    return add_derived_metrics(strip_sensitive_fields(converted))
