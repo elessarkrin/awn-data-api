@@ -1,4 +1,4 @@
-﻿# AWN Data API
+# AWN Data API
 
 REST API service that collects weather data from the [Ambient Weather Network (AWN) API](https://ambientweather.docs.apiary.io/), converts measurements to metric units, stores data in SQLite, and exposes history, live stream, and astronomy endpoints.
 
@@ -186,7 +186,7 @@ cp .env.example .env
 | `BACKFILL_BATCH_SIZE` | Records fetched per backfill request | `288` |
 | `BACKFILL_REQUEST_DELAY` | Delay between backfill requests (seconds) | `1.1` |
 | `DATABASE_URL` | SQLAlchemy async DB URL | `sqlite+aiosqlite:///./weather.db` |
-| `CORS_ALLOW_ORIGINS` | Allowed browser origins (comma-separated or JSON list) | `http://localhost:5173,http://localhost:5174` |
+| `CORS_ALLOW_ORIGINS` | Allowed browser origins (comma-separated list) | `http://localhost:5173,http://localhost:5174` |
 | `CORS_ALLOW_CREDENTIALS` | Allow credentialed CORS requests | `true` |
 | `ASTRONOMY_API_KEY` | ipgeolocation astronomy API key | empty |
 | `LAT` | Astronomy latitude | empty |
