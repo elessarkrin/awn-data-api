@@ -18,15 +18,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def main():
+async def main() -> int:
     if not (settings.awn_api_key and settings.awn_application_key):
-        logger.error("AWN credentials not configured — set AWN_API_KEY and AWN_APPLICATION_KEY")
-        return
+        logger.error("AWN credentials not configured - set AWN_API_KEY and AWN_APPLICATION_KEY")
+        return 1
 
     await init_db()
     total = await backfill_history(settings.awn_mac_address)
-    logger.info("Done — %d readings upserted", total)
+    logger.info("Done - %d readings upserted", total)
+    return 0
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))

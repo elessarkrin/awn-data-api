@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+!.env.example
+weather.db
+.idea
+.claude
+awn_data_api.egg-info
+nul
+frontend/node_modules

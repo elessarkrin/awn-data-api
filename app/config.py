@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = True
     gzip_minimum_size: int = 500
     gzip_compresslevel: int = 6
+    sse_emit_interval_seconds: int = 60
 
     astronomy_api_key: str = ""
     lat: str = ""

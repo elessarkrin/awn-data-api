@@ -1,0 +1,25 @@
+services:
+  awn-data-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: awn-data-api:latest
+    container_name: awn-data-api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////data/weather.db
+      RUN_BACKFILL_BEFORE_START: "1"
+      BACKFILL_STRICT: "0"
+      UVICORN_HOST: 0.0.0.0
+      UVICORN_PORT: "8000"
+      UVICORN_RELOAD: "0"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - awn_data:/data
+    restart: unless-stopped
+
+volumes:
+  awn_data:
