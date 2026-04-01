@@ -116,7 +116,6 @@ async def upsert_readings(readings: list[dict], mac_address: str) -> int:
         await session.execute(stmt)
         await session.commit()
     await invalidate_statistics_cache(mac_address)
-
     return len(rows)
 
 
@@ -289,24 +288,46 @@ async def purge_old_readings(mac_address: str) -> int:
         return result.rowcount
 
 
+def _seconds_until_next_tick(tick_minutes: int = 5) -> float:
+    """Return seconds until the next clock-aligned tick (e.g. :00, :05, :10, ...)."""
+    now = datetime.now(timezone.utc)
+    current_seconds = now.minute * 60 + now.second + now.microsecond / 1_000_000
+    tick_seconds = tick_minutes * 60
+    elapsed = current_seconds % tick_seconds
+    return tick_seconds - elapsed
+
+
 async def collection_loop() -> None:
     """Main collection loop that runs as a background task.
 
+    Fetches immediately on startup, then on clock-aligned 5-minute ticks.
     Uses real AWN API if credentials are configured, otherwise generates mock data.
     """
     mac = settings.awn_mac_address
-    interval = settings.collection_interval_seconds
     use_mock = not (settings.awn_api_key and settings.awn_application_key)
+    tick_minutes = settings.collection_interval_seconds // 60 or 5
 
     logger.info(
-        "Starting collector: mac=%s, interval=%ds, retention=%dd, mode=%s",
+        "Starting collector: mac=%s, tick=%dm, retention=%dd, mode=%s",
         mac,
-        interval,
+        tick_minutes,
         settings.daily_retention_days,
         "mock" if use_mock else "real",
     )
 
+    first_run = True
     while True:
+        # On first run fetch immediately; afterwards sleep until next clock tick
+        if not first_run:
+            wait = _seconds_until_next_tick(tick_minutes)
+            logger.info("Next collection in %.0fs", wait)
+            try:
+                await asyncio.sleep(wait)
+            except asyncio.CancelledError:
+                logger.info("Collection loop cancelled during sleep, shutting down")
+                raise
+        first_run = False
+
         try:
             if use_mock:
                 converted = add_derived_metrics(generate_mock_reading())
@@ -314,7 +335,6 @@ async def collection_loop() -> None:
                 raw_list = await fetch_readings_page(limit=1)
                 if not raw_list:
                     logger.warning("No data returned from AWN API")
-                    await asyncio.sleep(interval)
                     continue
                 converted = convert_reading(raw_list[0])
 
@@ -338,6 +358,9 @@ async def collection_loop() -> None:
                 converted.get("temp_c", 0),
             )
 
+        except asyncio.CancelledError:
+            logger.info("Collection loop cancelled, shutting down")
+            raise
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
                 logger.warning("AWN API rate limited, backing off")
@@ -348,5 +371,3 @@ async def collection_loop() -> None:
             logger.error("AWN API request error: %s", exc)
         except Exception:
             logger.exception("Unexpected error in collection loop")
-
-        await asyncio.sleep(interval)

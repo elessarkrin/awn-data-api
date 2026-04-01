@@ -3,7 +3,8 @@ set -eu
 
 cd "${APP_DIR:-/app}"
 
-if [ "${RUN_BACKFILL_BEFORE_START:-1}" = "1" ]; then
+case "${RUN_BACKFILL_BEFORE_START:-1}" in 1|true|yes) _do_backfill=1 ;; *) _do_backfill=0 ;; esac
+if [ "$_do_backfill" = "1" ]; then
   echo "[entrypoint] Running backfill: ${BACKFILL_CMD:-python backfill.py}"
   if ! sh -c "${BACKFILL_CMD:-python backfill.py}"; then
     if [ "${BACKFILL_STRICT:-0}" = "1" ]; then
@@ -26,7 +27,7 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
-UVICORN_CMD="uvicorn ${UVICORN_APP:-main:app} --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-8000} --workers ${UVICORN_WORKERS:-1} --log-level ${UVICORN_LOG_LEVEL:-info}"
+UVICORN_CMD="uvicorn ${UVICORN_APP:-main:app} --host ${UVICORN_HOST:-0.0.0.0} --port ${UVICORN_PORT:-8000} --workers ${UVICORN_WORKERS:-1} --log-level ${UVICORN_LOG_LEVEL:-info} --no-server-header"
 
 if [ "${UVICORN_RELOAD:-0}" = "1" ]; then
   UVICORN_CMD="${UVICORN_CMD} --reload"

@@ -7,7 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import Response
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import RedirectResponse, Response
 from starlette.types import Scope
 
 from app.collector import collection_loop
@@ -38,14 +40,31 @@ class SPAStaticFiles(StaticFiles):
             raise
 
 
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _on_collector_done(task: asyncio.Task) -> None:
+    """Log if the collector exits unexpectedly (not via cancellation)."""
+    _background_tasks.discard(task)
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Collector task died with exception: %s", exc, exc_info=exc)
+    else:
+        logger.warning("Collector task exited unexpectedly without error")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     await init_db()
     logger.info("Database initialized")
 
-    # Start the collector (runs in parallel â€” SSE subscribers get live data right away)
+    # Start the collector (runs in parallel — SSE subscribers get live data right away)
     collector_task = asyncio.create_task(collection_loop())
+    _background_tasks.add(collector_task)
+    collector_task.add_done_callback(_on_collector_done)
     logger.info("Data collector started")
 
     yield
@@ -100,6 +119,21 @@ app = FastAPI(
     ],
 )
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add cache-control for API routes and strip server/version headers."""
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        response = await call_next(request)
+        if request.url.path.startswith("/api"):
+            response.headers["Cache-Control"] = "no-store"
+        for header in ("server", "x-powered-by"):
+            if header in response.headers:
+                del response.headers[header]
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 app.add_middleware(
     GZipMiddleware,
     minimum_size=settings.gzip_minimum_size,
@@ -123,6 +157,11 @@ app.mount(
     name="react-app",
 )
 
+
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    """Redirect root requests to the React app."""
+    return RedirectResponse(url="/app")
 
 @app.get(
     "/health",
@@ -148,5 +187,5 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, server_header=False)
 

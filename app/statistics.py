@@ -36,11 +36,6 @@ class _DayMetrics:
     humidity: list[float] = field(default_factory=list)
 
 
-def _current_bucket_start() -> datetime:
-    now = datetime.now(UTC)
-    return now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0)
-
-
 def _to_float(value) -> float | None:
     if isinstance(value, (int, float)):
         v = float(value)
@@ -206,6 +201,11 @@ def _calculate_statistics(readings: list[DailyReading]) -> ReadingStatistics:
     )
 
 
+def _current_bucket_start() -> datetime:
+    now = datetime.now(UTC)
+    return now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0)
+
+
 async def invalidate_statistics_cache(mac_address: str | None = None) -> None:
     """Invalidate cached station statistics for one MAC or all MACs."""
     if mac_address is None:
@@ -230,8 +230,7 @@ async def get_reading_statistics(
         if cached is not None and cached[0] == bucket_start:
             return cached[1]
 
-        owns_session = session is None
-        if owns_session:
+        if session is None:
             async with async_session() as owned_session:
                 result = await owned_session.execute(
                     select(DailyReading)
